@@ -1,74 +1,83 @@
-# R Script to create volcano plot
-# This is useable with any data frame
-library("DESeq2") # if using DESeq2
-library("RColorBrewer")
-library("ggplot2")
+# IMPORTANT: This assumes you have 2 groups, 3 samples
+# and the same Gene list G for all groups and samples, for example:
+# Gene Sample Group Expression
+# Gene1      1     A  0.5137255
+#  Gene1      2     A  0.8946849
+#  Gene1      3     A  0.1910234
+#  Gene2      1     A  0.6132183
+#  Gene2      2     A  0.8249944
+#  Gene2      3     A  0.3590501
+#  Geen3      1     A  0.5804939
+#  Gene3      2     A  0.1091862
+#  Gene3      3     A  3.4992056
+# Gene1      1     B  2.3453736
+# Gene1      2     B  1.8809525
+# Geen1      3     B  0.5960169
+# Gene2      1     B  1.1647344
+# Geen2      2     B  3.3823561
+# Gene2      3     B  1.3459597
+# Gene3      1     B  2.9756238
+# Geen3      2     B  2.7968380
+# Gene3      3     B  3.9710568
 
+# replace "tdata" with the name of your dataframe
+# replace the Group name and Sample Name with the
+# respective names from the the data frame columns
 
-# To use with DESeq2, do the following:
-# #
-# log-normalize, or use vsd
-# # DESeq2Obj_transformed <- rlog(DESeq2Obj, blind=FALSE)
-# then convert from object to matrix using assay
-# # matrix_exampleDataFrame <- assay(DESeq2Obj_transformed)
-# finally create data frame from matrix
-# # exampleDataFrame <- as.data.frame(matrix_exampleDataFrame)
-# NOTE that you will likely next have to do sorting, like pval < 0.05
-# #
+working_df <- tdata
 
+# separate into groups
+df_GroupA <- working_df[working_df$Group == "A", ] # <--- replace group name here
+df_GroupB <- working_df[working_df$Group == "B", ] # <--- and here
+df_GroupA_sample1 <- df_GroupA[df_GroupA$Sample == 1, ] # <--- Replace Sample name here
+df_GroupA_sample2 <- df_GroupA[df_GroupA$Sample == 2, ] # <--- And here
+df_GroupA_sample3 <- df_GroupA[df_GroupA$Sample == 3, ] # <--- And here
 
-# Start, assumes you have a data frame of
-# expression,pvalue,log2FoldChange,log10(padj),other,other,...
-nm <- rownames(exampleDataFrame)
-exampleDataFrame[,"names"] <- nm
+df_GroupB_sample1 <- df_GroupB[df_GroupB$Sample == 1, ] # <--- And here
+df_GroupB_sample2 <- df_GroupB[df_GroupB$Sample == 2, ] # <--- And here
+df_GroupB_sample3 <- df_GroupB[df_GroupB$Sample == 3, ] # <--- And here
 
+# IMPORTANT: verify here that the gene order is the same!
+head(df_GroupA_sample1)
+tail(df_GroupA_sample1)
+head(df_GroupB_sample2)
+tail(df_GroupB_sample2)
+head(df_GroupB_sample3)
+tail(df_GroupB_sample3)
 
-# To create a factor for the sorted pvalues
-# add column of 0 1 for TrtCtrl pvalue
-# then add nested if to find pval < 0.05 in both data sets
-exampleDataFrame$pTrtCtrl <- ifelse(df_res_b31_TrtCtrl$padj < 0.05, 1, 0)
-exampleDataFrame$pRegnTrt <- ifelse(df_res_b31_Regrn_Trt$padj < 0.05, 1, 0)
-# also can filter for both conditions pvalue
-exampleDataFrame$pBoth <- ifelse(exampleDataFrame$pTrtCtrl == 1, ifelse(exampleDataFrame$pRegnTrt == 1, 1, 0), 0)
-# optional sorting step
-exampleDataFrame_sorted <- exampleDataFrame[order(exampleDataFrame$pBoth, decreasing = TRUE),]
-# This step all in one:
-# Either use a string as a factor--the first line and second--or use a numeric factor and label in ggplot2--use only the first line
-exampleDataFrame$colorflags <- ifelse(exampleDataFrame$padj < 0.05, ifelse(exampleDataFrame$log2FoldChange > 1, 1, ifelse(exampleDataFrame$log2FoldChange < -1, -1, 0)),0)
-exampleDataFrame$cflags <- ifelse(exampleDataFrame$colorflags == -1, "down", ifelse(exampleDataFrame$colorflags == 0, "notsignificant", ifelse(exampleDataFrame$colorflags == 1, "up", 0)))
+# order in columns is sample 1,2,3
+df_GroupA_samples <- as.data.frame(df_GroupA_sample1[ ,c("Gene", "Expression")])
+df_GroupA_samples$Exprn2 <- df_GroupA_sample2[ ,c("Expression")]
+df_GroupA_samples$Exprn3 <- df_GroupA_sample3[ ,c("Expression")]
+colnames(df_GroupA_samples) <- c("GeneName", "Exprn1", "Exprn2", "Exprn3")
+nm <- as.character(df_GroupA_samples[,1])
+df_GroupA_sampleVals <- as.data.frame(df_GroupA_samples[2:4], row.names = nm)
 
-# create Volcano Plot
-p <- ggplot(exampleDataFrame, aes(x=log2FoldChange, y=-log10(padj), colour=cflags)) + geom_point(shape=21)
-p <- p + geom_vline(xintercept=-1) + geom_vline(xintercept = 1) + geom_hline(yintercept = 1.3) + scale_x_continuous(limits=c(-26,26)) + xlab("Log2 Fold Change") + ylab("-log10 p-value") + geom_hline(yintercept = 1.3) + scale_x_continuous(limits=c(-26,26)) + xlab("Log2 Fold Change") + ylab("-log10 p-value")
-p <- p + scale_color_manual(values=c(notsignificant="black", up="red", down="blue"))
+df_GroupA_sampleVals$meanVals <- apply(df_GroupA_sampleVals, 1, function(x) {mean(x, na.rm = TRUE) })
+log2vals <- log2(df_GroupA_sampleVals$meanVals)
+df_GroupA_sampleVals$log2Vals <- log2vals
 
+# order in columns is sample 1,2,3
+df_GroupB_samples <- as.data.frame(df_GroupB_sample1[ ,c("Gene", "Expression")])
+df_GroupB_samples$Exprn2 <- df_GroupB_sample2[ ,c("Expression")]
+df_GroupB_samples$Exprn3 <- df_GroupB_sample3[ ,c("Expression")]
+colnames(df_GroupB_samples) <- c("GeneName", "Exprn1", "Exprn2", "Exprn3")
+nm <- as.character(df_GroupB_samples[,1])
+df_GroupB_sampleVals <- as.data.frame(df_GroupB_samples[2:4], row.names = nm)
 
-# Create PCA Plot
-# note that you need 2 groups or the plot will be odd or meaningless
-# # such as treated counts and control counts
-ggplot(dataFrame, aes(PC1, PC2, color=xVarColumn, shape=yVarColumn)) + geom_point(size=3) + xlab(paste0("PC1: ",percentVar[1],"% variance")) + ylab(paste0("PC2: ", percentVar[2],"% variance"))
+df_GroupB_sampleVals$meanVals <- apply(df_GroupB_sampleVals, 1, function(x) {mean(x, na.rm = TRUE) })
+log2vals <- log2(df_GroupB_sampleVals$meanVals)
+df_GroupB_sampleVals$log2Vals <- log2vals
 
+log2vals_sample1 <- df_GroupA_sampleVals$log2Vals
+ggplot_df <- as.data.frame(log2vals_sample1)
+ggplot_df$groupBlog2vals <- df_GroupB_sampleVals$log2Vals
+colnames(ggplot_df) <- c("log2SampleA", "log2SampleB")
+rownames(ggplot_df) <- nm
 
-# Create Heatmap
-treatmentFactor <- ifelse(exampleDataFrame$Condition == "Treatment1", 1, ifelse(t$Condition == "Treatment2", 2, ifelse(t$Condition == "Control", 3, ifelse(t$Condition == "Treatment3", 4, -1))))
-exampleDataFrame$CFactor <- treatmentFactor
-# create a color palette that ggplot sources, note there are two sets of values
-# # so you will need to provide a second set of values when the plot is created
-colors <- colorRampPalette(c("lightblue", "green", "red"))(3)
-p <- ggplot(exampleDataFrame, aes(x=Condition, y=Gene, fill=Count))
-# a final color plot will be used for the colors in the heatmap
-p + geom_tile() + scale_x_discrete() + scale_fill_gradientn(colors=c("blue", "darkred"))
-
-
-
-# view plot in RStudio
-p
-
-# view plot in R
-p + scale_color_manual(values=c(notsignificant="black", up="red", down="blue"))
-# or
-print(p)
-# save to png, NOT using RStudio, or RStudio with Linux/Windows with RStudio
-ggsave("exampleDataFramePlot.png", width=32, height=32, units="cm")
-# save to png using RStudio with MacOSX
-# MacOSX: View/Zoom, then take screenshot with Cmd-Ctrl-Shift-4, or Grab
+# parsed values are log2 values of the genes in the data frame ggplot_df
+# log2SampleA log2SampleB
+# gene1_log2_sampleA  gene1_log2_sampleB
+# gene2_log2_sampleA  gene2_log2_sampleB
+# gene3_log2_sampleA  gene3_log2_sampleB
+# gene4_log2_sampleA  gene4_log2_sampleB
